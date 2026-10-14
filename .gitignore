@@ -2,18 +2,20 @@
 /node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
 
 # Next.js build output
 /.next/
 /out/
 /build
 /dist
+
+# Test coverage artifacts
+/coverage/
+*.lcov
+.nyc_output
+
+# TypeScript build cache
+*.tsbuildinfo
 
 # Environment variables
 .env
@@ -43,3 +45,10 @@ Thumbs.db
 
 # Local agent config
 .agents/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
