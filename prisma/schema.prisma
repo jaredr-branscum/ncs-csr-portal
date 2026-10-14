@@ -1,0 +1,155 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  OVERDUE
+  INACTIVE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  OVERDUE
+  CANCELLED
+}
+
+enum PurchaseStatus {
+  PAID
+  FAILED
+}
+
+enum PurchaseType {
+  SUBSCRIPTION
+  SINGLE_WASH
+  COUPON
+}
+
+model User {
+  id        String     @id @default(uuid())
+  name      String
+  email     String     @unique
+  phone     String
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  vehicles  Vehicle[]
+  purchases Purchase[]
+
+  @@index([status])
+  @@index([name])
+  @@index([phone])
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+model Vehicle {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  licensePlate String
+  make         String
+  model        String
+  year         Int
+  color        String
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  subscriptions Subscription[]
+
+  @@index([userId])
+  @@index([licensePlate])
+  @@index([deletedAt])
+  @@index([userId, deletedAt])
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  priceCents  Int
+  currency    String   @default("USD")
+  interval    String   @default("MONTHLY")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id            String             @id @default(uuid())
+  vehicleId     String
+  vehicle       Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  planId        String
+  plan          Plan               @relation(fields: [planId], references: [id])
+  status        SubscriptionStatus @default(ACTIVE)
+  startedAt     DateTime           @default(now())
+  nextBillingAt DateTime
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([vehicleId])
+  @@index([planId])
+  @@index([status])
+  @@index([vehicleId, createdAt(sort: Desc)])
+}
+
+model Purchase {
+  id          String         @id @default(uuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  description String
+  amountCents Int
+  currency    String         @default("USD")
+  status      PurchaseStatus @default(PAID)
+  type        PurchaseType
+  createdAt   DateTime       @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+enum OperatorRole {
+  SUPPORT_REP
+  ACCOUNT_SPECIALIST
+  OPERATIONS_MANAGER
+}
+
+enum AuditAction {
+  VIEW_CUSTOMER_360
+  UPDATE_ACCOUNT
+  ADD_VEHICLE
+  REMOVE_VEHICLE
+  SUBSCRIBE_VEHICLE
+  TRANSFER_SUBSCRIPTION
+  CANCEL_SUBSCRIPTION
+  RESOLVE_OVERDUE_PAYMENT
+  DEACTIVATE_ACCOUNT
+  REACTIVATE_ACCOUNT
+}
+
+model AuditLog {
+  id                 String        @id @default(uuid())
+  operatorId         String
+  operatorName       String
+  operatorRole       OperatorRole
+  action             AuditAction
+  targetUserId       String
+  targetCustomerName String?
+  details            String?
+  createdAt          DateTime      @default(now())
+
+  @@index([targetUserId])
+  @@index([operatorId])
+  @@index([action])
+  @@index([createdAt])
+}
