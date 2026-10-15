@@ -12,7 +12,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['lib/utils/**/*.ts'],
+      include: [
+        'lib/utils/**/*.ts',
+        'lib/auth/**/*.ts',
+        'lib/domain/audit.ts',
+      ],
       thresholds: {
         lines: 100,
         functions: 100,
