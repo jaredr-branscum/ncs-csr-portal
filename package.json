@@ -17,7 +17,10 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:status": "prisma migrate status",
     "prisma:migrate:resolve": "prisma migrate resolve",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "docker:db": "docker compose up db -d",
+    "docker:up": "docker compose --profile seed up -d",
+    "docker:seed": "docker compose run --rm db-seed"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
