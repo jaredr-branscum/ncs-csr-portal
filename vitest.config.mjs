@@ -16,6 +16,7 @@ export default defineConfig({
         'lib/utils/**/*.ts',
         'lib/auth/**/*.ts',
         'lib/domain/audit.ts',
+        'lib/domain/search.ts',
       ],
       thresholds: {
         lines: 100,
