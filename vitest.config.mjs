@@ -20,6 +20,7 @@ export default defineConfig({
         'lib/domain/customer.ts',
         'lib/domain/purchase.ts',
         'lib/domain/search.ts',
+        'lib/domain/vehicle.ts',
       ],
       thresholds: {
         lines: 100,
