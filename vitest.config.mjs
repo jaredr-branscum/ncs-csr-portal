@@ -17,6 +17,7 @@ export default defineConfig({
         'lib/auth/**/*.ts',
         'lib/domain/audit.ts',
         'lib/domain/customer.ts',
+        'lib/domain/purchase.ts',
         'lib/domain/search.ts',
       ],
       thresholds: {
