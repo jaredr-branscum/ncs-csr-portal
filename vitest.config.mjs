@@ -15,6 +15,7 @@ export default defineConfig({
       include: [
         'lib/utils/**/*.ts',
         'lib/auth/**/*.ts',
+        'lib/domain/account.ts',
         'lib/domain/audit.ts',
         'lib/domain/customer.ts',
         'lib/domain/purchase.ts',
