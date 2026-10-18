@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UserStatus, type User } from '@prisma/client';
+import { recordCustomerViewAction } from '@/app/actions/audit';
 import {
   Mail,
   Phone,
@@ -214,7 +215,14 @@ export function CustomerProfileCard({
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
   const [isViewingAudit, setIsViewingAudit] = useState(false);
+  const loggedViewRef = useRef<string | null>(null);
   const memberSince = formatDate(user.createdAt);
+
+  useEffect(() => {
+    if (loggedViewRef.current === user.id) return;
+    loggedViewRef.current = user.id;
+    recordCustomerViewAction(user.id, user.name);
+  }, [user.id, user.name]);
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs">

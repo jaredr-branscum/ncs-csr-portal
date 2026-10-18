@@ -122,9 +122,11 @@ The user interface is modeled after modern enterprise support consoles:
 - **Adaptive Mobile Ergonomics**: On small viewports, the master list and detail pane automatically toggle with clear navigational breadcrumbs, ensuring full usability on mobile and tablet devices.
 - **Graceful Error Recovery & 404 Routing**: `app/error.tsx` provides a localized error boundary with CSR incident digest tracking and retry capability, preventing transient service failures from crashing the entire browser session. A branded `app/not-found.tsx` adheres strictly to AMP automotive design tokens with directory recovery navigation.
 
-### Dedicated Audit Trail UI Console
-Customer accountability is surfaced directly within the workspace:
+### Dedicated Audit Trail UI Console & Compliance Tracking
+Customer accountability and PII compliance are surfaced directly within the workspace:
 - `AuditHistoryModal` integrates into the customer profile card, allowing CSR operators to inspect chronological audit entries for any customer account on-demand.
+- **Offset Pagination Standards**: Offset page-based pagination (`DEFAULT_AUDIT_PAGE_SIZE = 10`) with smooth page navigation, matching the `PurchaseLedger` pattern.
+- **Customer 360 Inspection Logging**: Displaying a customer profile card dispatches `recordCustomerViewAction` to record an immutable `AuditAction.VIEW_CUSTOMER_360` event with operator attribution.
 - Displays operator attribution, action types, target entity IDs, and localized timestamps.
 
 ### Client State Synchronization Across Server Action Revalidations

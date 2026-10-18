@@ -1,10 +1,24 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition, useCallback } from 'react';
 import { AuditAction, type AuditLog } from '@prisma/client';
 import { loadCustomerAuditHistoryAction } from '@/app/actions/audit';
 import { formatDate } from '@/lib/utils/date';
-import { X, History, User, Clock, Loader2, AlertCircle } from 'lucide-react';
+import { DEFAULT_AUDIT_PAGE_SIZE } from '@/lib/domain/audit';
+import {
+  calculateTotalPages,
+  calculateItemRange,
+} from '@/lib/utils/pagination';
+import {
+  X,
+  History,
+  User,
+  Clock,
+  Loader2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 
 interface AuditHistoryModalProps {
   userId: string;
@@ -145,25 +159,104 @@ function AuditLogBody({
   );
 }
 
-export function AuditHistoryModal({
-  userId,
-  customerName,
-  onClose,
-}: AuditHistoryModalProps) {
+interface AuditPaginationBarProps {
+  currentPage: number;
+  totalPages: number;
+  start: number;
+  end: number;
+  totalCount: number;
+  isPending: boolean;
+  onPageChange: (page: number) => void;
+}
+
+function AuditPaginationBar({
+  currentPage,
+  totalPages,
+  start,
+  end,
+  totalCount,
+  isPending,
+  onPageChange,
+}: AuditPaginationBarProps) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100">
+      <p className="text-xs text-slate-500 font-medium">
+        Showing <span className="font-semibold text-slate-800">{start}</span>–
+        <span className="font-semibold text-slate-800">{end}</span> of{' '}
+        <span className="font-semibold text-slate-800">{totalCount}</span> events
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1 || isPending}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          aria-label="Previous audit page"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          <span>Previous</span>
+        </button>
+        <span className="text-xs font-medium text-slate-600 px-1">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages || isPending}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          aria-label="Next audit page"
+        >
+          <span>Next</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function useAuditHistory(userId: string) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
+  const fetchPage = useCallback((page: number) => {
     startTransition(async () => {
-      const res = await loadCustomerAuditHistoryAction(userId);
+      const res = await loadCustomerAuditHistoryAction(userId, page, DEFAULT_AUDIT_PAGE_SIZE);
       if (res.success) {
         setLogs(res.logs);
+        setTotalCount(res.totalCount);
+        setCurrentPage(res.page);
+        setError(undefined);
       } else {
         setError(res.error);
       }
     });
   }, [userId]);
+
+  useEffect(() => {
+    fetchPage(1);
+  }, [fetchPage]);
+
+  return { currentPage, totalCount, logs, error, isPending, fetchPage };
+}
+
+export function AuditHistoryModal({
+  userId,
+  customerName,
+  onClose,
+}: AuditHistoryModalProps) {
+  const { currentPage, totalCount, logs, error, isPending, fetchPage } = useAuditHistory(userId);
+  const totalPages = calculateTotalPages(totalCount, DEFAULT_AUDIT_PAGE_SIZE);
+  const { start, end } = calculateItemRange(currentPage, DEFAULT_AUDIT_PAGE_SIZE, totalCount);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages || newPage === currentPage || isPending) return;
+    fetchPage(newPage);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -173,6 +266,15 @@ export function AuditHistoryModal({
           <div className="mt-4">
             <AuditLogBody isPending={isPending} logs={logs} error={error} />
           </div>
+          <AuditPaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            start={start}
+            end={end}
+            totalCount={totalCount}
+            isPending={isPending}
+            onPageChange={handlePageChange}
+          />
           <div className="pt-4 mt-4 flex justify-end border-t border-slate-100">
             <button
               type="button"

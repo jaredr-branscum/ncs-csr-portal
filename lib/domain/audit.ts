@@ -105,3 +105,8 @@ export function toAuditLogData(event: AuditEvent) {
     createdAt: new Date(event.timestamp),
   };
 }
+
+/**
+ * Default number of audit log records displayed per page.
+ */
+export const DEFAULT_AUDIT_PAGE_SIZE = 10;
