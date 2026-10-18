@@ -4,6 +4,7 @@ import { buildSearchWhereClause } from '@/lib/domain/search';
 import { CustomerList } from '@/components/CustomerList';
 import { WorkspacePlaceholder } from '@/components/WorkspacePlaceholder';
 import { CustomerProfileCard } from '@/components/customer/CustomerProfileCard';
+import { VehicleGarage } from '@/components/customer/VehicleGarage';
 import { PurchaseLedger } from '@/components/customer/PurchaseLedger';
 import {
   toDirectoryCustomer,
@@ -13,7 +14,7 @@ import {
 import { DEFAULT_PURCHASE_PAGE_SIZE } from '@/lib/domain/purchase';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { PurchaseStatus, PurchaseType, type Prisma } from '@prisma/client';
+import { PurchaseStatus, PurchaseType, type Plan, type Prisma } from '@prisma/client';
 
 interface PageProps {
   searchParams: Promise<{
@@ -24,13 +25,17 @@ interface PageProps {
 
 type SelectedUserRecord = NonNullable<Awaited<ReturnType<typeof fetchSelectedUser>>>;
 
+interface CustomerWorkspaceProps {
+  user: SelectedUserRecord;
+  currentQuery?: string;
+  availablePlans: Plan[];
+}
+
 function CustomerWorkspace({
   user,
   currentQuery,
-}: {
-  user: SelectedUserRecord;
-  currentQuery?: string;
-}) {
+  availablePlans,
+}: CustomerWorkspaceProps) {
   const backHref = currentQuery ? `/?q=${encodeURIComponent(currentQuery)}` : '/';
 
   return (
@@ -44,7 +49,13 @@ function CustomerWorkspace({
           <span>Back to Customer Directory</span>
         </Link>
       </div>
-      <CustomerProfileCard user={user} />
+      <CustomerProfileCard key={`profile-${user.id}-${user.status}`} user={user} />
+      <VehicleGarage
+        key={`garage-${user.id}-${user.vehicles.length}`}
+        vehicles={user.vehicles}
+        userId={user.id}
+        availablePlans={availablePlans}
+      />
       <PurchaseLedger
         key={`${user.id}-${user.purchaseStats?.totalCount ?? 0}-${user.purchases[0]?.id ?? ''}`}
         userId={user.id}
@@ -61,6 +72,16 @@ async function fetchSelectedUser(userId?: string) {
     prisma.user.findUnique({
       where: { id: userId },
       include: {
+        vehicles: {
+          where: { deletedAt: null },
+          include: {
+            subscriptions: {
+              include: { plan: true },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         purchases: {
           orderBy: { createdAt: 'desc' },
           take: DEFAULT_PURCHASE_PAGE_SIZE,
@@ -87,8 +108,8 @@ async function fetchSelectedUser(userId?: string) {
   };
 }
 
-async function fetchDirectoryData(where: Prisma.UserWhereInput, userId?: string) {
-  const [rawUsers, totalCount, selectedUser] = await Promise.all([
+async function fetchHomePageData(where: Prisma.UserWhereInput, userId?: string) {
+  const [rawUsers, totalCount, selectedUser, availablePlans] = await Promise.all([
     prisma.user.findMany({
       where,
       include: {
@@ -101,6 +122,9 @@ async function fetchDirectoryData(where: Prisma.UserWhereInput, userId?: string)
     }),
     prisma.user.count({ where }),
     fetchSelectedUser(userId),
+    prisma.plan.findMany({
+      orderBy: { priceCents: 'asc' },
+    }),
   ]);
 
   const { items, nextCursor, hasMore } = extractPaginatedItems(rawUsers, DEFAULT_PAGE_SIZE);
@@ -110,6 +134,7 @@ async function fetchDirectoryData(where: Prisma.UserWhereInput, userId?: string)
     nextCursor,
     hasMore,
     selectedUser,
+    availablePlans,
   };
 }
 
@@ -117,7 +142,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   await connection();
   const { q, userId } = await searchParams;
   const where = buildSearchWhereClause(q);
-  const data = await fetchDirectoryData(where, userId);
+  const data = await fetchHomePageData(where, userId);
 
   return (
     <div className="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 h-full overflow-hidden">
@@ -146,6 +171,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             key={data.selectedUser.id}
             user={data.selectedUser}
             currentQuery={q}
+            availablePlans={data.availablePlans}
           />
         ) : (
           <WorkspacePlaceholder />
