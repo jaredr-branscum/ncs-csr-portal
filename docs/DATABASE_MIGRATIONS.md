@@ -79,7 +79,7 @@ To baseline the live database without re-executing existing DDL statements:
 
 ### 2. Automated Production & CI/CD Deployment
 
-In production environments (e.g., Docker container startup, Kubernetes job, Vercel/Render build steps):
+In CI/CD environments (e.g., [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) and production container startup:
 
 ```bash
 npm run prisma:migrate:deploy
@@ -87,6 +87,7 @@ npm run prisma:migrate:deploy
 
 - **Idempotent**: Evaluates pending migrations against `_prisma_migrations` and applies only unapplied scripts.
 - **Fail-Fast**: Halts execution if a migration fails, rolling back where supported.
+- **CI Test Suite Integration**: The GitHub Actions `test-e2e` job applies `prisma:migrate:deploy` against the ephemeral PostgreSQL 17 service container before executing seeding and Playwright suites.
 ---
 
 ### 3. Creating New Schema Migrations (Development)
