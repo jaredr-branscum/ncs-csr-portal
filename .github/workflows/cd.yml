@@ -15,6 +15,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ncs_csr_portal?schema=public"
+
 jobs:
   verify:
     name: Pre-Release Quality Gate
