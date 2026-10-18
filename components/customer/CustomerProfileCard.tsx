@@ -11,11 +11,15 @@ import {
   ShieldCheck,
   ShieldAlert,
   UserX,
+  UserCheck,
+  History,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
-import { canDeactivateAccount } from '@/lib/domain/account';
+import { canReactivateAccount } from '@/lib/domain/account';
 import { EditAccountModal } from './EditAccountModal';
 import { DeactivateAccountModal } from './DeactivateAccountModal';
+import { ReactivateAccountModal } from './ReactivateAccountModal';
+import { AuditHistoryModal } from './AuditHistoryModal';
 
 interface CustomerProfileCardProps {
   user: User;
@@ -78,11 +82,23 @@ interface ActionButtonsProps {
   user: User;
   onEdit: () => void;
   onDeactivate: () => void;
+  onReactivate: () => void;
+  onViewAudit: () => void;
 }
 
-function ActionButtons({ user, onEdit, onDeactivate }: ActionButtonsProps) {
+function ActionButtons({ user, onEdit, onDeactivate, onReactivate, onViewAudit }: ActionButtonsProps) {
   return (
     <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+      <button
+        type="button"
+        onClick={onViewAudit}
+        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors cursor-pointer"
+        title="View immutable CSR audit log for this customer"
+      >
+        <History className="w-3.5 h-3.5 text-slate-500" />
+        <span>Audit History</span>
+      </button>
+
       <button
         type="button"
         onClick={onEdit}
@@ -92,7 +108,16 @@ function ActionButtons({ user, onEdit, onDeactivate }: ActionButtonsProps) {
         <span>Edit Profile</span>
       </button>
 
-      {canDeactivateAccount(user.status) && (
+      {canReactivateAccount(user.status) ? (
+        <button
+          type="button"
+          onClick={onReactivate}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 rounded-lg shadow-2xs transition-colors cursor-pointer"
+        >
+          <UserCheck className="w-3.5 h-3.5" />
+          <span>Reactivate Account</span>
+        </button>
+      ) : (
         <button
           type="button"
           onClick={onDeactivate}
@@ -106,14 +131,53 @@ function ActionButtons({ user, onEdit, onDeactivate }: ActionButtonsProps) {
   );
 }
 
+interface ProfileModalsProps {
+  user: User;
+  isEditing: boolean;
+  isDeactivating: boolean;
+  isReactivating: boolean;
+  isViewingAudit: boolean;
+  onCloseEdit: () => void;
+  onCloseDeactivate: () => void;
+  onCloseReactivate: () => void;
+  onCloseAudit: () => void;
+}
+
+function ProfileModals({
+  user,
+  isEditing,
+  isDeactivating,
+  isReactivating,
+  isViewingAudit,
+  onCloseEdit,
+  onCloseDeactivate,
+  onCloseReactivate,
+  onCloseAudit,
+}: ProfileModalsProps) {
+  return (
+    <>
+      {isEditing && <EditAccountModal user={user} onClose={onCloseEdit} />}
+      {isDeactivating && <DeactivateAccountModal user={user} onClose={onCloseDeactivate} />}
+      {isReactivating && <ReactivateAccountModal user={user} onClose={onCloseReactivate} />}
+      {isViewingAudit && (
+        <AuditHistoryModal userId={user.id} customerName={user.name} onClose={onCloseAudit} />
+      )}
+    </>
+  );
+}
+
 function CustomerProfileHeader({
   user,
   onEdit,
   onDeactivate,
+  onReactivate,
+  onViewAudit,
 }: {
   user: User;
   onEdit: () => void;
   onDeactivate: () => void;
+  onReactivate: () => void;
+  onViewAudit: () => void;
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
@@ -136,14 +200,20 @@ function CustomerProfileHeader({
         user={user}
         onEdit={onEdit}
         onDeactivate={onDeactivate}
+        onReactivate={onReactivate}
+        onViewAudit={onViewAudit}
       />
     </div>
   );
 }
 
-export function CustomerProfileCard({ user }: CustomerProfileCardProps) {
+export function CustomerProfileCard({
+  user,
+}: CustomerProfileCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [isViewingAudit, setIsViewingAudit] = useState(false);
   const memberSince = formatDate(user.createdAt);
 
   return (
@@ -154,6 +224,8 @@ export function CustomerProfileCard({ user }: CustomerProfileCardProps) {
         user={user}
         onEdit={() => setIsEditing(true)}
         onDeactivate={() => setIsDeactivating(true)}
+        onReactivate={() => setIsReactivating(true)}
+        onViewAudit={() => setIsViewingAudit(true)}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-5">
@@ -162,10 +234,17 @@ export function CustomerProfileCard({ user }: CustomerProfileCardProps) {
         <ContactItem icon={<Calendar className="w-3.5 h-3.5 text-slate-400" />} label="Member Since" value={memberSince} />
       </div>
 
-      {isEditing && <EditAccountModal user={user} onClose={() => setIsEditing(false)} />}
-      {isDeactivating && (
-        <DeactivateAccountModal user={user} onClose={() => setIsDeactivating(false)} />
-      )}
+      <ProfileModals
+        user={user}
+        isEditing={isEditing}
+        isDeactivating={isDeactivating}
+        isReactivating={isReactivating}
+        isViewingAudit={isViewingAudit}
+        onCloseEdit={() => setIsEditing(false)}
+        onCloseDeactivate={() => setIsDeactivating(false)}
+        onCloseReactivate={() => setIsReactivating(false)}
+        onCloseAudit={() => setIsViewingAudit(false)}
+      />
     </div>
   );
 }
