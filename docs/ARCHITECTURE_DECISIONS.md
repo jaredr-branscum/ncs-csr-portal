@@ -330,3 +330,45 @@ export function assertOperatorPermission(
 ```
 
 By decoupling identity resolution behind `lib/auth/session.ts`, the application maintains architectural readiness for a production environment while delivering an immediate, frictionless experience on live deployments.
+
+---
+
+## 9. Continuous Integration & Delivery (CI/CD) Architecture
+
+To safeguard domain invariants, enforce code quality standards, and guarantee reliable releases, the project incorporates an automated GitHub Actions CI/CD pipeline:
+
+```mermaid
+flowchart LR
+    subgraph CI["Continuous Integration (.github/workflows/ci.yml)"]
+        Lint["Lint & Function Limits"]
+        Typecheck["TypeScript Compiler"]
+        Unit["Unit Tests (100% Coverage)"]
+        Build["Next.js Standalone Build"]
+        E2E["Postgres 17 + Migrations + Playwright E2E"]
+        DockerCheck["Docker Multi-Stage Build"]
+        
+        Lint --> Build
+        Typecheck --> Build
+        Build --> E2E
+        Unit --> E2E
+        Build --> DockerCheck
+    end
+
+    subgraph CD["Continuous Delivery (.github/workflows/cd.yml)"]
+        GHCR["Build & Publish to GHCR<br/>(ghcr.io/jaredr-branscum/ncs-csr-portal)"]
+        Vercel["Serverless Edge Synchronization"]
+    end
+
+    CI -->|Push / Merge to main| CD
+```
+
+### 1. Automated Quality Gates
+1. **ESLint & Complexity Discipline**: Validates that functions adhere strictly to `<= 50` lines (`max-lines-per-function`), preventing monolithic handlers and maintaining clean domain decomposition.
+2. **Compile-Time Strictness**: `tsc --noEmit` verifies strict typing across all server and client boundaries with zero `any` tolerance.
+3. **Domain Purity & Coverage Gate**: Vitest enforces 100% coverage thresholds across domain models (`lib/domain/`) and utilities. Coverage artifacts are archived on every workflow run.
+4. **Isolated Database Services & E2E Validation**: End-to-end tests run in an ephemeral PostgreSQL 17 service container. The workflow executes versioned migrations (`prisma migrate deploy`), idempotent persona seeding (`prisma db seed`), and Playwright test assertions in Chromium.
+5. **Multi-Stage Docker Packaging**: Validates container image buildability, layer caching, and root privilege dropping to `nextjs:nodejs` (UID 1001).
+
+### 2. Containerized Release & Registry Delivery
+On pushes to `main` and version tags (`v*`), production images are automatically tagged (`latest`, `sha-<short>`, `vX.Y.Z`) and published to GitHub Container Registry (GHCR) utilizing GitHub's built-in `GITHUB_TOKEN` and GitHub Actions layer caching.
+

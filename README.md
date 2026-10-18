@@ -1,5 +1,8 @@
 # AMP CSR Portal
 
+[![CI Pipeline](https://github.com/jaredr-branscum/ncs-csr-portal/actions/workflows/ci.yml/badge.svg)](https://github.com/jaredr-branscum/ncs-csr-portal/actions/workflows/ci.yml)
+[![CD Release](https://github.com/jaredr-branscum/ncs-csr-portal/actions/workflows/cd.yml/badge.svg)](https://github.com/jaredr-branscum/ncs-csr-portal/actions/workflows/cd.yml)
+
 > **Live Deployment**: [https://ncs-csr-portal.vercel.app/](https://ncs-csr-portal.vercel.app/)
 
 Customer Service Representative (CSR) portal built for managing AMP car wash memberships, vehicle subscriptions, customer accounts, and billing resolution.
