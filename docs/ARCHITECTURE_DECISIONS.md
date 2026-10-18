@@ -188,3 +188,145 @@ The application is pre-configured and deployed for cloud operations:
 - **Function Length Discipline**: Functions across the codebase adhere to a strict 50-line limit enforced by ESLint (`max-lines-per-function`), mandating small, focused, and single-purpose helpers.
 - **TypeScript Strict Mode**: Zero `any` types, strict null checks, and explicit return types on domain functions.
 - **Zero Background Daemons**: Development servers and test suites run deterministically without unmanaged background processes.
+
+---
+
+## 8. Authentication & Operator Identity Architecture
+
+### Context & Specification Alignment
+The project specification mandates four core operational capabilities for the CSR portal: customer directory browsing, profile and vehicle subscription inspection, account details editing, and vehicle subscription lifecycle management (adding, removing, transferring). The specification does not request identity provider configuration, user registration screens, or operator credentials.
+
+Introducing a blocking authentication screen (e.g., email/password gates, OAuth with GitHub/Google, or external SaaS IAM providers like Clerk/Auth0) introduces unnecessary friction for this project that is out of scope.
+
+### The Pluggable Session Adapter Pattern
+To reconcile security readiness, authentication is implemented via a **Pluggable Session Adapter** located at [`lib/auth/session.ts`](../lib/auth/session.ts).
+
+```mermaid
+flowchart LR
+    subgraph Client["Presentation Layer"]
+        UI["CSR Workspace UI • Action Triggers"]
+    end
+
+    subgraph Actions["Server Actions ('use server')"]
+        SA["app/actions/*.ts"]
+    end
+
+    subgraph Adapter["Session Adapter Boundary"]
+        Session["lib/auth/session.ts<br/>getAuthenticatedOperator()"]
+    end
+
+    subgraph AuthProvider["Production Auth Provider (Swap Point)"]
+        NextAuth["NextAuth.js / Auth.js / Okta / Clerk / WorkOS"]
+        Cookie["Encrypted Session Cookie / JWT"]
+    end
+
+    subgraph Audit["Immutable Audit Trail"]
+        DB[("PostgreSQL AuditLog Table<br/>operatorId • operatorName • operatorRole")]
+    end
+
+    UI -->|Dispatches Action| SA
+    SA -->|Resolves Active Operator| Session
+    Session -.->|Drop-In Integration| AuthProvider
+    SA -->|Persists Operator Attribution| DB
+```
+
+#### Key Architectural Characteristics:
+1. **Decoupled Identity Contract**: All Server Actions (`app/actions/account.ts`, `app/actions/subscription.ts`, `app/actions/vehicle.ts`, `app/actions/payment.ts`) resolve operator identity solely through `getAuthenticatedOperator(): Promise<CsrOperator>`. Server Actions and domain validators have zero coupling to HTTP cookies, JWT libraries, or specific identity SDKs.
+2. **Typed Role-Based Enums**: Operator roles are strongly typed via Prisma's `OperatorRole` enum (`SUPPORT_REP`, `ACCOUNT_SPECIALIST`, `OPERATIONS_MANAGER`), establishing a foundation for Role-Based Access Control (RBAC).
+3. **Immutable Audit Attribution**: Every mutation executed in the portal captures the operator's ID, human-readable name, and assigned role, writing an immutable record to the `AuditLog` table. This provides non-repudiation and enterprise traceability for all destructive operations (account deactivations, subscription cancellations, overdue debt resolutions).
+
+### Production Implementation Blueprint
+
+In an enterprise deployment, this adapter transitions to a live identity provider in three straightforward steps without modifying any domain or application logic:
+
+#### Step 1: Route & Action Protection via Next.js Middleware
+Create `middleware.ts` at the repository root to enforce session token presence on all protected routes and Server Action invocations:
+
+```typescript
+// middleware.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export async function middleware(request: NextRequest) {
+  const sessionToken = request.cookies.get('__Secure-authjs.session-token') 
+    ?? request.cookies.get('authjs.session-token');
+
+  // Allow static assets, healthchecks, and public auth endpoints
+  if (
+    request.nextUrl.pathname.startsWith('/api/auth') ||
+    request.nextUrl.pathname.startsWith('/_next') ||
+    request.nextUrl.pathname === '/login'
+  ) {
+    return NextResponse.next();
+  }
+
+  // Redirect unauthenticated requests to the enterprise login portal
+  if (!sessionToken) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ['/((?!api/health|_next/static|_next/image|favicon.ico).*)'],
+};
+```
+
+#### Step 2: Drop-In Session Adapter Implementation
+Update [`lib/auth/session.ts`](../lib/auth/session.ts) to resolve the active session from the identity provider (e.g. NextAuth / Auth.js / Okta SAML):
+
+```typescript
+// lib/auth/session.ts
+import { auth } from '@/auth'; // NextAuth.js or Auth.js instance
+import { OperatorRole, type CsrOperator } from '@/lib/domain/audit';
+
+export async function getAuthenticatedOperator(): Promise<CsrOperator> {
+  const session = await auth();
+
+  if (!session?.user) {
+    throw new Error('Unauthorized: Active CSR operator session required.');
+  }
+
+  return {
+    id: session.user.id ?? 'unknown-operator',
+    name: session.user.name ?? 'CSR Operator',
+    role: (session.user.role as OperatorRole) ?? OperatorRole.SUPPORT_REP,
+    email: session.user.email ?? undefined,
+  };
+}
+```
+
+#### Step 3: Granular Role-Based Access Control (RBAC) Matrix
+The domain model and schema already define three distinct operator tiers. In production, permission checks are enforced as preconditions in the application layer before executing high-impact workflows:
+
+| Operation | Required Role | Risk Level | Rationale |
+| :--- | :--- | :---: | :--- |
+| **Directory Search & Customer 360** | `SUPPORT_REP`+ | Low | Frontline inquiry resolution; PII masked by default. |
+| **Edit Customer Information** | `SUPPORT_REP`+ | Low | Name, phone, and email correction upon caller verification. |
+| **Vehicle Subscription Lifecycle** | `SUPPORT_REP`+ | Medium | Add/cancel pass, transfer pass across customer vehicles. |
+| **Delinquent Payment Resolution** | `ACCOUNT_SPECIALIST`+ | High | Generates settlement invoices and clears financial balances. |
+| **Account Deactivation / Reactivation** | `ACCOUNT_SPECIALIST`+ | High | Cascades pass cancellations and revokes RFID gate access. |
+| **Full Audit Trail Inspection & Export** | `OPERATIONS_MANAGER` | High | Compliance reporting, dispute escalation, and operator oversight. |
+
+Enforcing this matrix requires a lightweight guard helper in `lib/auth/rbac.ts`:
+```typescript
+export function assertOperatorPermission(
+  operator: CsrOperator,
+  requiredRole: OperatorRole
+): void {
+  const roleHierarchy: Record<OperatorRole, number> = {
+    [OperatorRole.SUPPORT_REP]: 1,
+    [OperatorRole.ACCOUNT_SPECIALIST]: 2,
+    [OperatorRole.OPERATIONS_MANAGER]: 3,
+  };
+
+  if (roleHierarchy[operator.role] < roleHierarchy[requiredRole]) {
+    throw new Error(`Forbidden: Operation requires ${requiredRole} privileges.`);
+  }
+}
+```
+
+By decoupling identity resolution behind `lib/auth/session.ts`, the application maintains architectural readiness for a production environment while delivering an immediate, frictionless experience on live deployments.

@@ -66,12 +66,13 @@ The application is deployed on Vercel backed by serverless PostgreSQL (Neon) and
 - **Production Container**: Multi-stage [Dockerfile](Dockerfile) with root privilege dropping to non-root `nextjs:nodejs` user.
 - **Automated Client Generation**: Retains `"postinstall": "prisma generate"` for reliable zero-config CI/CD deployments.
 - **Audit Logging & Governance**: CSR actions are recorded in an immutable `AuditLog` table and viewable via the customer profile Audit History console.
+- **Pluggable Operator Session & Identity Adapter**: To eliminate lockout on the public Vercel deployment while retaining enterprise security readiness, authentication is isolated behind a canonical session adapter (`lib/auth/session.ts`). Mutations resolve operator identity through typed contracts and write immutable records to `AuditLog`. Complete NextAuth/Okta integration blueprints and RBAC matrix are documented in [ARCHITECTURE_DECISIONS.md (Section 8)](docs/ARCHITECTURE_DECISIONS.md#8-authentication--operator-identity-architecture).
 - **Concurrency & Invariant Guards**: Atomic database transactions guard against multi-pass payment race conditions, cross-garage license plate collisions, and invalid pass transfers.
 
 ---
 
 ## Documentation Reference
 
-- **[ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)**: System architecture, domain design principles, scalability patterns, and technical trade-offs.
+- **[ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md)**: System architecture, domain design principles, scalability patterns, enterprise authentication & RBAC blueprint, and technical trade-offs.
 - **[DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md)**: Schema versioning, baseline migration instructions for live deployments, and CI/CD deployment guide.
 - **[DOCKER.md](docs/DOCKER.md)**: Operational guide for container deployment, CI/CD seed runners, and database volume management.
