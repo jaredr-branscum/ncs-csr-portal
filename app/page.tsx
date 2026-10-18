@@ -4,6 +4,7 @@ import { buildSearchWhereClause } from '@/lib/domain/search';
 import { CustomerList } from '@/components/CustomerList';
 import { WorkspacePlaceholder } from '@/components/WorkspacePlaceholder';
 import { CustomerProfileCard } from '@/components/customer/CustomerProfileCard';
+import { OverdueAlertBanner } from '@/components/customer/OverdueAlertBanner';
 import { VehicleGarage } from '@/components/customer/VehicleGarage';
 import { PurchaseLedger } from '@/components/customer/PurchaseLedger';
 import {
@@ -14,7 +15,13 @@ import {
 import { DEFAULT_PURCHASE_PAGE_SIZE } from '@/lib/domain/purchase';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { PurchaseStatus, PurchaseType, type Plan, type Prisma } from '@prisma/client';
+import {
+  SubscriptionStatus,
+  PurchaseStatus,
+  PurchaseType,
+  type Plan,
+  type Prisma,
+} from '@prisma/client';
 
 interface PageProps {
   searchParams: Promise<{
@@ -31,12 +38,26 @@ interface CustomerWorkspaceProps {
   availablePlans: Plan[];
 }
 
-function CustomerWorkspace({
-  user,
-  currentQuery,
-  availablePlans,
-}: CustomerWorkspaceProps) {
+function getOverdueAlertSubscriptions(vehicles: SelectedUserRecord['vehicles']) {
+  return vehicles.flatMap((v) =>
+    v.subscriptions
+      .filter((s) => s.status === SubscriptionStatus.OVERDUE)
+      .map((s) => ({
+        id: s.id,
+        plan: s.plan,
+        vehicle: {
+          licensePlate: v.licensePlate,
+          make: v.make,
+          model: v.model,
+          year: v.year,
+        },
+      }))
+  );
+}
+
+function CustomerWorkspace({ user, currentQuery, availablePlans }: CustomerWorkspaceProps) {
   const backHref = currentQuery ? `/?q=${encodeURIComponent(currentQuery)}` : '/';
+  const overdueSubscriptions = getOverdueAlertSubscriptions(user.vehicles);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
@@ -49,6 +70,11 @@ function CustomerWorkspace({
           <span>Back to Customer Directory</span>
         </Link>
       </div>
+      <OverdueAlertBanner
+        key={`overdue-${user.id}-${user.status}-${overdueSubscriptions.length}`}
+        user={user}
+        overdueSubscriptions={overdueSubscriptions}
+      />
       <CustomerProfileCard key={`profile-${user.id}-${user.status}`} user={user} />
       <VehicleGarage
         key={`garage-${user.id}-${user.vehicles.length}`}

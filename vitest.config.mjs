@@ -18,6 +18,7 @@ export default defineConfig({
         'lib/domain/account.ts',
         'lib/domain/audit.ts',
         'lib/domain/customer.ts',
+        'lib/domain/payment.ts',
         'lib/domain/purchase.ts',
         'lib/domain/search.ts',
         'lib/domain/subscription.ts',
